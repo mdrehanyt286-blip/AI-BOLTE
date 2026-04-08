@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Terminal, Send, Shield, Cpu, Zap, Code, Copy, Check } from 'lucide-react';
+import { Terminal, Send, Shield, Cpu, Zap, Code, Copy, Check, Settings, X, Key } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -37,6 +37,8 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('rehan_vip_api_key') || '');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,6 +46,11 @@ export default function ChatInterface() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const saveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem('rehan_vip_api_key', key);
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -63,7 +70,7 @@ export default function ChatInterface() {
       parts: [{ text: msg.content }]
     }));
 
-    const response = await generateAIResponse(input, history);
+    const response = await generateAIResponse(input, history, apiKey);
 
     const aiMessage: Message = {
       role: 'model',
@@ -92,12 +99,60 @@ export default function ChatInterface() {
             <p className="text-[10px] text-[#00ff41]/60 uppercase tracking-widest">SAB KA BAAP KUN REHAN</p>
           </div>
         </div>
-        <div className="flex gap-4">
-          <Cpu className="w-5 h-5 text-[#00ff41]/40" />
-          <Zap className="w-5 h-5 text-[#00ff41]/40" />
-          <Code className="w-5 h-5 text-[#00ff41]/40" />
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setShowSettings(!showSettings)}
+            className={`p-2 rounded-lg transition-colors ${showSettings ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'text-[#00ff41]/40 hover:text-[#00ff41]'}`}
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+          <div className="hidden md:flex gap-4">
+            <Cpu className="w-5 h-5 text-[#00ff41]/40" />
+            <Zap className="w-5 h-5 text-[#00ff41]/40" />
+            <Code className="w-5 h-5 text-[#00ff41]/40" />
+          </div>
         </div>
       </motion.div>
+
+      {/* Settings Panel */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden mb-6"
+          >
+            <div className="terminal-window p-6 bg-[#00ff41]/5 border-[#00ff41]/40">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2 text-[#00ff41]">
+                  <Key className="w-4 h-4" />
+                  <span className="text-xs uppercase tracking-widest font-bold">API Configuration</span>
+                </div>
+                <button onClick={() => setShowSettings(false)} className="text-[#00ff41]/40 hover:text-[#00ff41]">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-[#00ff41]/60 mb-2">Gemini API Key</label>
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => saveApiKey(e.target.value)}
+                    placeholder="Enter your API key here..."
+                    className="w-full bg-black/60 border border-[#00ff41]/30 rounded px-4 py-2 text-sm text-[#00ff41] focus:outline-none focus:border-[#00ff41] transition-colors"
+                  />
+                  <p className="mt-2 text-[9px] text-[#00ff41]/40 leading-relaxed">
+                    Your key is stored locally on this device. REHAN VIP AI uses this to connect to the Matrix. 
+                    Don't share it with anyone, saale!
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Chat Area */}
       <div className="flex-1 terminal-window flex flex-col overflow-hidden mb-6">

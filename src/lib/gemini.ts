@@ -1,11 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-
-export async function generateAIResponse(prompt: string, history: { role: 'user' | 'model', parts: { text: string }[] }[]) {
-  if (!process.env.GEMINI_API_KEY) {
-    return "Error: GEMINI_API_KEY missing. APK build karte waqt .env file check kar saale! // REHAN";
+export async function generateAIResponse(
+  prompt: string, 
+  history: { role: 'user' | 'model', parts: { text: string }[] }[],
+  userApiKey?: string
+) {
+  const apiKey = userApiKey || process.env.GEMINI_API_KEY || "";
+  
+  if (!apiKey) {
+    return "Error: API Key missing saale! Settings mein jaa kar apni Gemini API Key daal warna kuch nahi chalega. // REHAN";
   }
+
+  const ai = new GoogleGenAI({ apiKey });
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
@@ -20,9 +27,9 @@ export async function generateAIResponse(prompt: string, history: { role: 'user'
       },
     });
 
-    return response.text || "Error: System failure. Matrix connection lost.";
+    return response.text || "Error: System failure. Matrix connection lost. // REHAN";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Error: Failed to connect to the Matrix.";
+    return `Error: Matrix connection failed. Check your API Key saale! ${error instanceof Error ? error.message : ''} // REHAN`;
   }
 }
