@@ -3,11 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useState } from 'react';
 import ChatInterface from './components/ChatInterface';
+import HomePage from './components/HomePage';
 
 export default function App() {
+  const [view, setView] = useState<'home' | 'chat'>('home');
+
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden bg-black">
       {/* Visual Effects */}
       <div className="scanline" />
       <div className="crt-overlay" />
@@ -17,7 +21,11 @@ export default function App() {
       
       {/* Main Content */}
       <main className="relative z-10">
-        <ChatInterface />
+        {view === 'home' ? (
+          <HomePage onStart={() => setView('chat')} />
+        ) : (
+          <ChatInterface onBack={() => setView('home')} />
+        )}
       </main>
     </div>
   );

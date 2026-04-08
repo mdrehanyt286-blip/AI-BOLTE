@@ -35,6 +35,10 @@
   .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-[#00ff41]/20 rounded-full hover:bg-[#00ff41]/40 transition-colors;
   }
+
+  .glow-text {
+    text-shadow: 0 0 10px rgba(0, 255, 65, 0.5), 0 0 20px rgba(0, 255, 65, 0.3);
+  }
 }
 
 @keyframes scanline {

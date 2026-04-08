@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Terminal, Send, Shield, Cpu, Zap, Code, Copy, Check, Settings, X, Key, Image as ImageIcon, Trash2, Mic, MicOff } from 'lucide-react';
+import { Terminal, Send, Shield, Cpu, Zap, Code, Copy, Check, Settings, X, Key, Image as ImageIcon, Trash2, Mic, MicOff, Home } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -34,7 +34,7 @@ const CopyButton = ({ text }: { text: string }) => {
   );
 };
 
-export default function ChatInterface() {
+export default function ChatInterface({ onBack }: { onBack?: () => void }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -317,10 +317,21 @@ export default function ChatInterface() {
       {/* Chat Area */}
       <div className="flex-1 terminal-window flex flex-col overflow-hidden mb-6">
         <div className="terminal-header">
-          <div className="flex gap-2">
-            <div className="terminal-btn bg-[#ff5f56]" />
-            <div className="terminal-btn bg-[#ffbd2e]" />
-            <div className="terminal-btn bg-[#27c93f]" />
+          <div className="flex items-center gap-4">
+            <div className="flex gap-2">
+              <div className="terminal-btn bg-[#ff5f56]" />
+              <div className="terminal-btn bg-[#ffbd2e]" />
+              <div className="terminal-btn bg-[#27c93f]" />
+            </div>
+            {onBack && (
+              <button 
+                onClick={onBack}
+                className="flex items-center gap-1.5 text-[10px] text-[#00ff41]/40 hover:text-[#00ff41] uppercase tracking-widest transition-colors"
+              >
+                <Home className="w-3 h-3" />
+                <span>Exit Matrix</span>
+              </button>
+            )}
           </div>
           <div className="text-[10px] text-[#00ff41]/40 uppercase tracking-widest">
             root@rehan-vip-ai:~/matrix
