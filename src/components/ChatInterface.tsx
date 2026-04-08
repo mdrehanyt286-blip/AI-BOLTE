@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Terminal, Send, Shield, Cpu, Zap, Code, Copy, Check, Settings, X, Key, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Terminal, Send, Shield, Cpu, Zap, Code, Copy, Check, Settings, X, Key, Image as ImageIcon, Trash2, Mic, MicOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -47,14 +47,83 @@ export default function ChatInterface() {
     return { gemini: oldKey, deepseek: '', openai: '' };
   });
   const [selectedImage, setSelectedImage] = useState<{ data: string, mimeType: string } | null>(null);
+  const [generationTime, setGenerationTime] = useState(0);
+  const [isListening, setIsListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'hi-IN';
+
+      recognitionRef.current.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          }
+        }
+        if (finalTranscript) {
+          setInput(prev => {
+            const separator = (prev.endsWith(' ') || prev === '') ? '' : ' ';
+            return prev + separator + finalTranscript;
+          });
+        }
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          alert("Abey saale! Microphone permission nahi di tune. Browser settings mein jaa kar allow kar warna voice typing nahi chalegi. // REHAN");
+        } else if (event.error === 'network') {
+          alert("Network error saale! Internet check kar apna. // REHAN");
+        }
+        setIsListening(false);
+      };
+    } else {
+      console.warn('Speech recognition not supported in this browser.');
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      recognitionRef.current?.start();
+      setIsListening(true);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoading) {
+      setGenerationTime(0);
+      timerRef.current = setInterval(() => {
+        setGenerationTime(prev => prev + 0.1);
+      }, 100);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isLoading]);
 
   const saveApiKey = (provider: 'gemini' | 'deepseek' | 'openai', key: string) => {
     const newKeys = { ...apiKeys, [provider]: key };
@@ -345,23 +414,28 @@ export default function ChatInterface() {
               animate={{ opacity: 1 }}
               className="flex justify-start"
             >
-              <div className="bg-white/5 border border-white/10 p-4 rounded-lg">
-                <div className="flex gap-1">
-                  <motion.div 
-                    animate={{ opacity: [0, 1, 0] }}
-                    transition={{ repeat: Infinity, duration: 1 }}
-                    className="w-2 h-2 bg-[#00ff41] rounded-full"
-                  />
-                  <motion.div 
-                    animate={{ opacity: [0, 1, 0] }}
-                    transition={{ repeat: Infinity, duration: 1, delay: 0.2 }}
-                    className="w-2 h-2 bg-[#00ff41] rounded-full"
-                  />
-                  <motion.div 
-                    animate={{ opacity: [0, 1, 0] }}
-                    transition={{ repeat: Infinity, duration: 1, delay: 0.4 }}
-                    className="w-2 h-2 bg-[#00ff41] rounded-full"
-                  />
+              <div className="bg-white/5 border border-white/10 p-4 rounded-lg flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1">
+                    <motion.div 
+                      animate={{ opacity: [0, 1, 0] }}
+                      transition={{ repeat: Infinity, duration: 1 }}
+                      className="w-2 h-2 bg-[#00ff41] rounded-full"
+                    />
+                    <motion.div 
+                      animate={{ opacity: [0, 1, 0] }}
+                      transition={{ repeat: Infinity, duration: 1, delay: 0.2 }}
+                      className="w-2 h-2 bg-[#00ff41] rounded-full"
+                    />
+                    <motion.div 
+                      animate={{ opacity: [0, 1, 0] }}
+                      transition={{ repeat: Infinity, duration: 1, delay: 0.4 }}
+                      className="w-2 h-2 bg-[#00ff41] rounded-full"
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono text-[#00ff41]/60 uppercase tracking-widest">
+                    Processing: {generationTime.toFixed(1)}s
+                  </span>
                 </div>
               </div>
             </motion.div>
@@ -417,6 +491,15 @@ export default function ChatInterface() {
             accept="image/*" 
             className="hidden" 
           />
+          <button
+            onClick={toggleListening}
+            className={`p-3 rounded-lg transition-all active:scale-95 ${
+              isListening ? 'bg-red-500/20 text-red-500 animate-pulse' : 'text-[#00ff41]/60 hover:text-[#00ff41] hover:bg-[#00ff41]/10'
+            }`}
+            title={isListening ? "Stop listening" : "Voice typing"}
+          >
+            {isListening ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+          </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             className="p-3 text-[#00ff41]/60 hover:text-[#00ff41] hover:bg-[#00ff41]/10 rounded-lg transition-all active:scale-95"
