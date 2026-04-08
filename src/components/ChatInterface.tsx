@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { generateAIResponse } from '../lib/gemini';
+import { callAI, Provider } from '../lib/aiService';
 
 interface Message {
   role: 'user' | 'model';
@@ -39,7 +39,13 @@ export default function ChatInterface() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('rehan_vip_api_key') || '');
+  const [selectedProvider, setSelectedProvider] = useState<Provider>(() => (localStorage.getItem('rehan_selected_provider') as Provider) || 'gemini');
+  const [apiKeys, setApiKeys] = useState<{gemini: string, deepseek: string, openai: string}>(() => {
+    const saved = localStorage.getItem('rehan_api_keys');
+    if (saved) return JSON.parse(saved);
+    const oldKey = localStorage.getItem('rehan_vip_api_key') || '';
+    return { gemini: oldKey, deepseek: '', openai: '' };
+  });
   const [selectedImage, setSelectedImage] = useState<{ data: string, mimeType: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,9 +56,16 @@ export default function ChatInterface() {
     }
   }, [messages]);
 
-  const saveApiKey = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem('rehan_vip_api_key', key);
+  const saveApiKey = (provider: 'gemini' | 'deepseek' | 'openai', key: string) => {
+    const newKeys = { ...apiKeys, [provider]: key };
+    setApiKeys(newKeys);
+    localStorage.setItem('rehan_api_keys', JSON.stringify(newKeys));
+    if (provider === 'gemini') localStorage.setItem('rehan_vip_api_key', key);
+  };
+
+  const handleProviderChange = (p: Provider) => {
+    setSelectedProvider(p);
+    localStorage.setItem('rehan_selected_provider', p);
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,16 +104,31 @@ export default function ChatInterface() {
         : [{ text: msg.content }]
     }));
 
-    const response = await generateAIResponse(input || "Analyze this image saale! // REHAN", history, apiKey, currentImage || undefined);
+    try {
+      const response = await callAI(
+        input || "Analyze this image saale! // REHAN", 
+        history, 
+        { provider: selectedProvider, apiKey: apiKeys[selectedProvider] }, 
+        currentImage || undefined
+      );
 
-    const aiMessage: Message = {
-      role: 'model',
-      content: response,
-      timestamp: new Date(),
-    };
+      const aiMessage: Message = {
+        role: 'model',
+        content: response,
+        timestamp: new Date(),
+      };
 
-    setMessages(prev => [...prev, aiMessage]);
-    setIsLoading(false);
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      const errorMessage: Message = {
+        role: 'model',
+        content: error instanceof Error ? error.message : "Unknown error in the Matrix. // REHAN",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -154,21 +182,63 @@ export default function ChatInterface() {
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-[#00ff41]/60 mb-2">Gemini API Key</label>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => saveApiKey(e.target.value)}
-                    placeholder="Enter your API key here..."
-                    className="w-full bg-black/60 border border-[#00ff41]/30 rounded px-4 py-2 text-sm text-[#00ff41] focus:outline-none focus:border-[#00ff41] transition-colors"
-                  />
-                  <p className="mt-2 text-[9px] text-[#00ff41]/40 leading-relaxed">
-                    Your key is stored locally on this device. REHAN VIP AI uses this to connect to the Matrix. 
-                    Don't share it with anyone, saale!
-                  </p>
+                  <label className="block text-[10px] uppercase tracking-widest text-[#00ff41]/60 mb-3">Select Active Provider</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['gemini', 'deepseek', 'openai'] as Provider[]).map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => handleProviderChange(p)}
+                        className={`py-2 text-[10px] uppercase tracking-wider border rounded transition-all ${
+                          selectedProvider === p 
+                            ? 'bg-[#00ff41]/20 border-[#00ff41] text-[#00ff41]' 
+                            : 'border-[#00ff41]/20 text-[#00ff41]/40 hover:border-[#00ff41]/40'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                <div className="space-y-4 border-t border-[#00ff41]/10 pt-4">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest text-[#00ff41]/60 mb-2">Gemini API Key</label>
+                    <input
+                      type="password"
+                      value={apiKeys.gemini}
+                      onChange={(e) => saveApiKey('gemini', e.target.value)}
+                      placeholder="Enter Gemini key..."
+                      className="w-full bg-black/60 border border-[#00ff41]/30 rounded px-4 py-2 text-sm text-[#00ff41] focus:outline-none focus:border-[#00ff41] transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest text-[#00ff41]/60 mb-2">DeepSeek API Key</label>
+                    <input
+                      type="password"
+                      value={apiKeys.deepseek}
+                      onChange={(e) => saveApiKey('deepseek', e.target.value)}
+                      placeholder="Enter DeepSeek key..."
+                      className="w-full bg-black/60 border border-[#00ff41]/30 rounded px-4 py-2 text-sm text-[#00ff41] focus:outline-none focus:border-[#00ff41] transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest text-[#00ff41]/60 mb-2">OpenAI API Key</label>
+                    <input
+                      type="password"
+                      value={apiKeys.openai}
+                      onChange={(e) => saveApiKey('openai', e.target.value)}
+                      placeholder="Enter OpenAI key..."
+                      className="w-full bg-black/60 border border-[#00ff41]/30 rounded px-4 py-2 text-sm text-[#00ff41] focus:outline-none focus:border-[#00ff41] transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-[9px] text-[#00ff41]/40 leading-relaxed border-t border-[#00ff41]/10 pt-4">
+                  All keys are stored locally. REHAN VIP AI switches between Matrix protocols based on your selection. 
+                  Don't leak your keys, saale!
+                </p>
               </div>
             </div>
           </motion.div>
