@@ -1,8 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 export async function generateAIResponse(prompt: string, history: { role: 'user' | 'model', parts: { text: string }[] }[]) {
+  if (!process.env.GEMINI_API_KEY) {
+    return "Error: GEMINI_API_KEY missing. APK build karte waqt .env file check kar saale! // REHAN";
+  }
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
