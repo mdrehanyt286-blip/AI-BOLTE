@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Terminal, Send, Shield, Cpu, Zap, Code, Copy, Check, Settings, X, Key } from 'lucide-react';
+import { Terminal, Send, Shield, Cpu, Zap, Code, Copy, Check, Settings, X, Key, Image as ImageIcon, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -11,6 +11,7 @@ interface Message {
   role: 'user' | 'model';
   content: string;
   timestamp: Date;
+  image?: string;
 }
 
 const CopyButton = ({ text }: { text: string }) => {
@@ -39,7 +40,9 @@ export default function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('rehan_vip_api_key') || '');
+  const [selectedImage, setSelectedImage] = useState<{ data: string, mimeType: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -52,25 +55,43 @@ export default function ChatInterface() {
     localStorage.setItem('rehan_vip_api_key', key);
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      const data = base64.split(',')[1];
+      setSelectedImage({ data, mimeType: file.type });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && !selectedImage) || isLoading) return;
 
     const userMessage: Message = {
       role: 'user',
       content: input,
       timestamp: new Date(),
+      image: selectedImage ? `data:${selectedImage.mimeType};base64,${selectedImage.data}` : undefined,
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    const currentImage = selectedImage;
+    setSelectedImage(null);
     setIsLoading(true);
 
     const history = messages.map(msg => ({
       role: msg.role,
-      parts: [{ text: msg.content }]
+      parts: msg.image 
+        ? [{ text: msg.content }, { inlineData: { data: msg.image.split(',')[1], mimeType: msg.image.split(';')[0].split(':')[1] } }]
+        : [{ text: msg.content }]
     }));
 
-    const response = await generateAIResponse(input, history, apiKey);
+    const response = await generateAIResponse(input || "Analyze this image saale! // REHAN", history, apiKey, currentImage || undefined);
 
     const aiMessage: Message = {
       role: 'model',
@@ -198,6 +219,13 @@ export default function ChatInterface() {
                     <span>•</span>
                     <span>{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
+                  
+                  {msg.image && (
+                    <div className="mb-4 rounded-lg overflow-hidden border border-[#00ff41]/20">
+                      <img src={msg.image} alt="User upload" className="max-w-full h-auto" referrerPolicy="no-referrer" />
+                    </div>
+                  )}
+
                   <div className="text-sm leading-relaxed markdown-body">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
@@ -271,6 +299,31 @@ export default function ChatInterface() {
         </div>
       </div>
 
+      {/* Image Preview */}
+      <AnimatePresence>
+        {selectedImage && (
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            className="mb-4 relative inline-block"
+          >
+            <img 
+              src={`data:${selectedImage.mimeType};base64,${selectedImage.data}`} 
+              alt="Preview" 
+              className="h-20 w-20 object-cover rounded-lg border border-[#00ff41]/50"
+              referrerPolicy="no-referrer"
+            />
+            <button 
+              onClick={() => setSelectedImage(null)}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Input Area */}
       <div className="relative group">
         <div className="absolute -inset-0.5 bg-[#00ff41]/20 rounded-lg blur opacity-0 group-focus-within:opacity-100 transition duration-500" />
@@ -284,15 +337,32 @@ export default function ChatInterface() {
             }
           }}
           placeholder="Execute command (Shift+Enter for new line)..."
-          className="relative w-full terminal-window bg-black/60 px-6 py-4 pr-16 focus:outline-none focus:border-[#00ff41] transition-colors placeholder:text-[#00ff41]/20 min-h-[120px] max-h-[400px] resize-none custom-scrollbar text-[#00ff41]"
+          className="relative w-full terminal-window bg-black/60 px-6 py-4 pr-32 focus:outline-none focus:border-[#00ff41] transition-colors placeholder:text-[#00ff41]/20 min-h-[120px] max-h-[400px] resize-none custom-scrollbar text-[#00ff41]"
         />
-        <button
-          onClick={handleSend}
-          disabled={isLoading || !input.trim()}
-          className="absolute right-4 bottom-4 p-3 text-[#00ff41] hover:bg-[#00ff41]/20 rounded-lg transition-all disabled:opacity-20 active:scale-95"
-        >
-          <Send className="w-6 h-6" />
-        </button>
+        <div className="absolute right-4 bottom-4 flex items-center gap-2">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleImageSelect} 
+            accept="image/*" 
+            className="hidden" 
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-3 text-[#00ff41]/60 hover:text-[#00ff41] hover:bg-[#00ff41]/10 rounded-lg transition-all active:scale-95"
+            title="Upload image"
+          >
+            <ImageIcon className="w-6 h-6" />
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={isLoading || (!input.trim() && !selectedImage)}
+            className="p-3 text-[#00ff41] hover:bg-[#00ff41]/20 rounded-lg transition-all disabled:opacity-20 active:scale-95"
+            title="Send command"
+          >
+            <Send className="w-6 h-6" />
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 text-[10px] text-center text-[#00ff41]/20 uppercase tracking-[0.3em]">
